@@ -13,6 +13,7 @@ class New_Device_Notification_VIP_Go {
 	 */
 	function __construct() {
 		add_filter( 'ndn_location', array( $this, 'filter_ndn_location' ) );
+		add_filter( 'ndn_run_for_current_user', array( $this, 'filter_ndn_run_for_current_user' ) );
 	}
 
 	/**
@@ -28,6 +29,22 @@ class New_Device_Notification_VIP_Go {
 		return $instance;
 	}
 
+	/**
+	 * Hooks the `ndn_run_for_current_user` filter in order to filter out NDN checks for
+	 * proxied requests.
+	 *
+	 * `A8C_PROXIED_REQUEST` constant is defined and set to `true` in case the request comes from known internal proxy IP.
+	 *
+	 * @param bool $is_privileged_user True if current user is privileged. False otherwise.
+	 *
+	 * @return bool False if current request is a proxied one.
+	 */
+	public function filter_ndn_run_for_current_user( $is_privileged_user ) {
+		if ( true === defined( 'A8C_PROXIED_REQUEST' ) && true === A8C_PROXIED_REQUEST ) {
+			return false;
+		}
+		return $is_privileged_user;	
+	}
 
 	/**
 	 * Hooks the `ndn_location` filter to supply the location

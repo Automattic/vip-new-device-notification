@@ -4,6 +4,8 @@
  * Class New_Device_Notification_WPCom
  *
  * Customisations for the WordPress.com platform.
+ *
+ * @phpcs:disable
  */
 class New_Device_Notification_WPCom {
 

@@ -1,15 +1,16 @@
-<?php /*
-
-**************************************************************************
-
-Plugin Name:  New Device Notification
-Description:  Uses a cookie to identify new devices that are used to log in. On new device detection, an e-mail is sent. This provides some basic improved security against compromised accounts.
-Author:       Automattic VIP Team
-Author URI:   http://vip.wordpress.com/
-Version: 2.0
-License: GPLv2
-
-**************************************************************************/
+<?php
+/**
+ * Plugin Name:  New Device Notification
+ * Description:  Uses a cookie to identify new devices that are used to log in. On new device detection, an e-mail is sent. This provides some basic improved security against compromised accounts.
+ * Author:       Automattic VIP Team
+ * Author URI:   http://vip.wordpress.com/
+ * Version: 2.0
+ * License: GPLv2
+ *
+ * @phpcs:disable WordPressVIPMinimum.Variables.RestrictedVariables.cache_constraints___SERVER__HTTP_USER_AGENT__
+ * @phpcs:disable WordPressVIPMinimum.Variables.RestrictedVariables.cache_constraints___COOKIE
+ * @phpcs:disable WordPressVIPMinimum.Functions.RestrictedFunctions.cookies_setcookie
+ */
 
 class New_Device_Notification {
 
@@ -62,7 +63,10 @@ class New_Device_Notification {
 		$this->set_cookie();
 
 		// Maybe we've seen this user+IP+agent before but they don't accept cookies?
-		$memcached_key = 'lastseen_' . $current_user->ID . '_' . md5( $_SERVER['REMOTE_ADDR'] . '|' . $_SERVER['HTTP_USER_AGENT'] );
+		// phpcs:ignore WordPressVIPMinimum.Variables.ServerVariables.UserControlledHeaders
+		$remote_addr = isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : '';
+		$user_agent  = isset( $_SERVER['HTTP_USER_AGENT'] ) ? $_SERVER['HTTP_USER_AGENT'] : '';
+		$memcached_key = 'lastseen_' . $current_user->ID . '_' . md5( $remote_addr . '|' . $user_agent );
 		if ( wp_cache_get( $memcached_key, 'newdevicenotification' ) )
 			return;
 
@@ -109,10 +113,13 @@ class New_Device_Notification {
 		$location->region = false;
 		$location->country_long = false;
 
+		// phpcs:ignore WordPressVIPMinimum.Variables.ServerVariables.UserControlledHeaders
+		$remote_addr = isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : '';
+
 		$location = apply_filters( 'ndn_location', $location );
 		$blogname = html_entity_decode( get_bloginfo( 'name' ), ENT_QUOTES );
-		$hostname = gethostbyaddr( $_SERVER['REMOTE_ADDR'] );
-		if ( $_SERVER['REMOTE_ADDR'] === $hostname ) {
+		$hostname = gethostbyaddr( $remote_addr );
+		if ( $remote_addr === $hostname ) {
 			$hostname = 'we were not able to get the host for this IP address';
 		}
 
@@ -120,7 +127,7 @@ class New_Device_Notification {
 		$installed_time = get_option( 'newdevicenotification_installedtime' );
 		$send_email  = ( time() - $installed_time < (int) apply_filters( 'ndn_grace_period', $this->grace_period ) ) ? false : true;
 
-		$send_email = apply_filters( 'ndn_send_email', $send_email, array( 'user' => $current_user, 'location' => $location, 'ip' => $_SERVER['REMOTE_ADDR'], 'hostname' => $hostname ) );
+		$send_email = apply_filters( 'ndn_send_email', $send_email, array( 'user' => $current_user, 'location' => $location, 'ip' => $remote_addr, 'hostname' => $hostname ) );
 
 		do_action( 'ndn_notify_of_new_device', $current_user, array(
 			'location' => $location,
@@ -137,7 +144,7 @@ class New_Device_Notification {
 				'blogname'       => $blogname,
 				'hostname'       => $hostname,
 				'location'       => $location->human,
-				'installed_time' => date( 'F jS, Y', $installed_time ),
+				'installed_time' => gmdate( 'F jS, Y', $installed_time ),
 			)
 		);
 
@@ -218,10 +225,11 @@ Resetting your password takes effect immediately.
 			$user_obj->display_name,                   // 1
 			$args['blogname'],                         // 2
 			trailingslashit( home_url() ),             // 3
-			$_SERVER['REMOTE_ADDR'],                   // 4
+			// phpcs:ignore WordPressVIPMinimum.Variables.ServerVariables.UserControlledHeaders
+			isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : '',                   // 4
 			$args['hostname'],                         // 5
 			$args['location'],                         // 6
-			strip_tags( $_SERVER['HTTP_USER_AGENT'] ), // 7, strip_tags() is better than nothing
+			strip_tags( isset( $_SERVER['HTTP_USER_AGENT'] ) ? $_SERVER['HTTP_USER_AGENT'] : '' ), // 7, strip_tags() is better than nothing
 			$user_obj->user_login,                     // 8
 			$args['installed_time']                    // 9, Not adjusted for timezone but close enough
 		);

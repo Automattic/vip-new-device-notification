@@ -63,9 +63,12 @@ class New_Device_Notification {
 		$this->set_cookie();
 
 		// Maybe we've seen this user+IP+agent before but they don't accept cookies?
-		// phpcs:ignore WordPressVIPMinimum.Variables.ServerVariables.UserControlledHeaders
-		$remote_addr = isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : '';
-		$user_agent  = isset( $_SERVER['HTTP_USER_AGENT'] ) ? $_SERVER['HTTP_USER_AGENT'] : '';
+		$remote_addr = filter_input( INPUT_SERVER, 'REMOTE_ADDR', FILTER_VALIDATE_IP );
+		$remote_addr = sanitize_text_field( $remote_addr );
+
+		$user_agent = filter_input( INPUT_SERVER, 'HTTP_USER_AGENT' );
+		$user_agent = sanitize_text_field( $user_agent );
+
 		$memcached_key = 'lastseen_' . $current_user->ID . '_' . md5( $remote_addr . '|' . $user_agent );
 		if ( wp_cache_get( $memcached_key, 'newdevicenotification' ) )
 			return;

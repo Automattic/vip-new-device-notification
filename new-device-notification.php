@@ -2,8 +2,8 @@
 /**
  * Plugin Name:  New Device Notification
  * Description:  Uses a cookie to identify new devices that are used to log in. On new device detection, an e-mail is sent. This provides some basic improved security against compromised accounts.
- * Author:       Automattic VIP Team
- * Author URI:   http://vip.wordpress.com/
+ * Author:       WordPress VIP
+ * Author URI:   https://wpvip.com/
  * Version: 2.0
  * License: GPLv2
  *

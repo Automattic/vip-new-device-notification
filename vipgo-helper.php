@@ -21,7 +21,7 @@ class New_Device_Notification_VIP_Go {
 	 *
 	 * @return New_Device_Notification_VIP_Go
 	 */
-	static public function instance() {
+	public static function instance() {
 		static $instance = false;
 		if ( ! $instance ) {
 			$instance = new New_Device_Notification_VIP_Go();
@@ -43,7 +43,7 @@ class New_Device_Notification_VIP_Go {
 		if ( true === defined( 'A8C_PROXIED_REQUEST' ) && true === A8C_PROXIED_REQUEST ) {
 			return false;
 		}
-		return $is_privileged_user;	
+		return $is_privileged_user; 
 	}
 
 	/**
@@ -55,7 +55,6 @@ class New_Device_Notification_VIP_Go {
 	 * @return object A stdClass object, detailing the location of the remote address
 	 */
 	public function filter_ndn_location( $location ) {
-
 		if ( isset( $_SERVER['HTTP_X_COUNTRY_CODE'] ) && is_string( $_SERVER['HTTP_X_COUNTRY_CODE'] ) ) {
 			$location->country_short = wp_strip_all_tags( $_SERVER['HTTP_X_COUNTRY_CODE'] );
 			$location->country_long  = $this->country_code_to_long( $location->country_short );

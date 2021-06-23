@@ -43,8 +43,9 @@ class New_Device_Notification {
 		// * Super admins (Automattic employees visiting your site)
 		// * Users who don't have /wp-admin/ access
 		$is_privileged_user = ! is_proxied_automattician() && current_user_can( 'edit_posts' );
-		if ( false === apply_filters( 'ndn_run_for_current_user', $is_privileged_user ) )
+		if ( false === apply_filters( 'ndn_run_for_current_user', $is_privileged_user ) ) {
 			return;
+		}
 
 		// Set up the per-blog salt
 		$salt = get_option( 'newdevicenotification_salt' );
@@ -56,8 +57,9 @@ class New_Device_Notification {
 		$this->cookie_hash = hash_hmac( 'md5', $current_user->ID, $salt );
 
 		// Seen this device before?
-		if ( $this->verify_cookie() )
+		if ( $this->verify_cookie() ) {
 			return;
+		}
 
 		// Attempt to mark this device as seen via a cookie
 		$this->set_cookie();
@@ -70,8 +72,9 @@ class New_Device_Notification {
 		$user_agent = sanitize_text_field( $user_agent );
 
 		$memcached_key = 'lastseen_' . $current_user->ID . '_' . md5( $remote_addr . '|' . $user_agent );
-		if ( wp_cache_get( $memcached_key, 'newdevicenotification' ) )
+		if ( wp_cache_get( $memcached_key, 'newdevicenotification' ) ) {
 			return;
+		}
 
 		// As a backup to the cookie, record this IP address (only in memcached for now, proper logging will come later)
 		wp_cache_set( $memcached_key, time(), 'newdevicenotification' );
@@ -79,30 +82,30 @@ class New_Device_Notification {
 		add_filter( 'ndn_send_email', array( $this, 'maybe_send_email' ), 10, 2 );
 
 		$this->notify_of_new_device();
-
 	}
 
 	public function verify_cookie() {
-		if ( ! empty( $_COOKIE[$this->cookie_name] ) && $_COOKIE[$this->cookie_name] === $this->cookie_hash )
+		if ( ! empty( $_COOKIE[ $this->cookie_name ] ) && $_COOKIE[ $this->cookie_name ] === $this->cookie_hash ) {
 			return true;
+		}
 
 		return false;
 	}
 
 	public function set_cookie() {
-		if ( headers_sent() )
+		if ( headers_sent() ) {
 			return false;
+		}
 
 		$tenyrsfromnow = time() + ( YEAR_IN_SECONDS * 10 );
 
-		$parts = parse_url( home_url() );
+		$parts          = parse_url( home_url() );
 		$cookie_domains = apply_filters( 'ndn_cookie_domains', array( $parts['host'] ) );
 		$cookie_domains = array_unique( $cookie_domains );
 
 		foreach ( $cookie_domains as $cookie_domain ) {
 			setcookie( $this->cookie_name, $this->cookie_hash, $tenyrsfromnow, COOKIEPATH, $cookie_domain, false, true );
 		}
-
 	}
 
 	public function notify_of_new_device() {
@@ -110,10 +113,10 @@ class New_Device_Notification {
 
 		wp_get_current_user();
 
-		$location = new stdClass();
-		$location->human = 'Location unknown';
-		$location->city = false;
-		$location->region = false;
+		$location               = new stdClass();
+		$location->human        = 'Location unknown';
+		$location->city         = false;
+		$location->region       = false;
 		$location->country_long = false;
 
 		// phpcs:ignore WordPressVIPMinimum.Variables.ServerVariables.UserControlledHeaders
@@ -128,22 +131,38 @@ class New_Device_Notification {
 
 		// If we're still in the grace period, don't send an e-mail
 		$installed_time = get_option( 'newdevicenotification_installedtime' );
-		$send_email  = ( time() - $installed_time < (int) apply_filters( 'ndn_grace_period', $this->grace_period ) ) ? false : true;
+		$send_email     = ( time() - $installed_time < (int) apply_filters( 'ndn_grace_period', $this->grace_period ) ) ? false : true;
 
-		$send_email = apply_filters( 'ndn_send_email', $send_email, array( 'user' => $current_user, 'location' => $location, 'ip' => $remote_addr, 'hostname' => $hostname ) );
+		$send_email = apply_filters(
+			'ndn_send_email',
+			$send_email,
+			array(
+				'user'     => $current_user,
+				'location' => $location,
+				'ip'       => $remote_addr,
+				'hostname' => $hostname,
+			) 
+		);
 
-		do_action( 'ndn_notify_of_new_device', $current_user, array(
-			'location' => $location,
-			'send_email' => $send_email,
-			'hostname' => $hostname,
-		) );
+		do_action(
+			'ndn_notify_of_new_device',
+			$current_user,
+			array(
+				'location'   => $location,
+				'send_email' => $send_email,
+				'hostname'   => $hostname,
+			) 
+		);
 
-		if ( ! $send_email )
+		if ( ! $send_email ) {
 			return false;
+		}
 
 		$subject = sprintf( apply_filters( 'ndn_subject', '[%1$s] Automated security advisory: %2$s has logged in from an unknown device' ), $blogname, $current_user->display_name );
 
-		$message = $this->get_standard_message( $current_user, array(
+		$message = $this->get_standard_message(
+			$current_user,
+			array(
 				'blogname'       => $blogname,
 				'hostname'       => $hostname,
 				'location'       => $location->human,
@@ -156,13 +175,14 @@ class New_Device_Notification {
 
 		$emails = apply_filters( 'ndn_send_email_to', $emails );
 
-		$headers  = 'Reply-to: "WordPress.com VIP Support" <vip-support@wordpress.com>' . "\r\n";
+		$headers = 'Reply-to: "WordPress.com VIP Support" <vip-support@wordpress.com>' . "\r\n";
 
 
 		// Filtering the email address instead of a boolean so we can change it if needed
 		$cc_user = apply_filters( 'ndn_cc_current_user', $current_user->user_email, $current_user );
-		if ( is_email( $cc_user ) )
+		if ( is_email( $cc_user ) ) {
 			$headers .= 'CC: ' . $cc_user . "\r\n";
+		}
 
 		$headers = apply_filters( 'ndn_headers', $headers );
 
@@ -172,16 +192,18 @@ class New_Device_Notification {
 	}
 
 	function maybe_send_email( $send_email, $user_info ) {
-		if ( $this->is_user_from_valid_ip( $user_info['ip'] ) )
+		if ( $this->is_user_from_valid_ip( $user_info['ip'] ) ) {
 			$send_email = false;
+		}
 
 		return $send_email;
 	}
 
 	function is_user_from_valid_ip( $ip ) {
 		$whitelisted_ips = apply_filters( 'ndn_ip_whitelist', array() );
-		if ( ! empty( $whitelisted_ips ) && in_array( $ip, $whitelisted_ips ) )
+		if ( ! empty( $whitelisted_ips ) && in_array( $ip, $whitelisted_ips ) ) {
 			return true;
+		}
 
 		return false; // covers two scenarios: invalid ip or no ip whitelist
 	}

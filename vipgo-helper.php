@@ -1,17 +1,19 @@
-<?php
+<?php // phpcs:ignore WordPress.Files.FileName.InvalidClassFileName
+/**
+ * Customisations for the VIP Go platform.
+ *
+ * @package New_Device_Notification
+ */
 
 /**
  * Class New_Device_Notification_VIP_Go
- *
- * Customisations for the VIP Go platform.
  */
-
 class New_Device_Notification_VIP_Go {
 
 	/**
 	 * New_Device_Notification_VIP_Go constructor.
 	 */
-	function __construct() {
+	public function __construct() {
 		add_filter( 'ndn_location', array( $this, 'filter_ndn_location' ) );
 		add_filter( 'ndn_run_for_current_user', array( $this, 'filter_ndn_run_for_current_user' ) );
 	}
@@ -40,19 +42,20 @@ class New_Device_Notification_VIP_Go {
 	 * @return bool False if current request is a proxied one.
 	 */
 	public function filter_ndn_run_for_current_user( $is_privileged_user ) {
+		// phpcs:ignore WordPressVIPMinimum.Constants.RestrictedConstants.UsingRestrictedConstant -- notice acknowledged
 		if ( true === defined( 'A8C_PROXIED_REQUEST' ) && true === A8C_PROXIED_REQUEST ) {
 			return false;
 		}
-		return $is_privileged_user; 
+		return $is_privileged_user;
 	}
 
 	/**
 	 * Hooks the `ndn_location` filter to supply the location
 	 * of the current remote address.
 	 *
-	 * @param object $location A stdClass object, detailing a location (possibly unknown)
+	 * @param object $location A stdClass object, detailing a location (possibly unknown).
 	 *
-	 * @return object A stdClass object, detailing the location of the remote address
+	 * @return object A stdClass object, detailing the location of the remote address.
 	 */
 	public function filter_ndn_location( $location ) {
 		if ( isset( $_SERVER['HTTP_X_COUNTRY_CODE'] ) && is_string( $_SERVER['HTTP_X_COUNTRY_CODE'] ) ) {
@@ -67,9 +70,9 @@ class New_Device_Notification_VIP_Go {
 	/**
 	 * Convert a two letter country code to a country name.
 	 *
-	 * @param string $code A two letter country code
+	 * @param string $code A two letter country code.
 	 *
-	 * @return string The name of a country, or an empty string if nothing matches the supplied code
+	 * @return string The name of a country, or an empty string if nothing matches the supplied code.
 	 */
 	public function country_code_to_long( $code ) {
 		$longs = array(

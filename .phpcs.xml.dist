@@ -49,6 +49,7 @@
 		<properties>
 			<property name="prefixes" type="array">
 				<element value="ndn"/>
+				<element value="new_device_notification"/>
 			</property>
 		</properties>
 	</rule>

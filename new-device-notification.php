@@ -1,4 +1,4 @@
-<?php
+<?php // phpcs:ignore WordPress.Files.FileName.InvalidClassFileName
 /**
  * Plugin Name:  New Device Notification
  * Description:  Uses a cookie to identify new devices that are used to log in. On new device detection, an e-mail is sent. This provides some basic improved security against compromised accounts.
@@ -12,21 +12,43 @@
  * @phpcs:disable WordPressVIPMinimum.Functions.RestrictedFunctions.cookies_setcookie
  */
 
+/**
+ * Class New_Device_Notification
+ *
+ * Plugin container
+ */
 class New_Device_Notification {
 
-	// Notifications won't be sent for a certain period of time after the plugin is enabled.
-	// This is to get all of the normal users into the logs and avoid spamming inboxes.
+	/**
+	 * Notifications won't be sent for a certain period of time after the plugin is enabled.
+	 * This is to get all of the normal users into the logs and avoid spamming inboxes.
+	 *
+	 * @var int $grace_period
+	 */
 	public $grace_period = 604800; // 1 week
 
+	/**
+	 * Cookie name
+	 *
+	 * @var string $cookie_name
+	 */
 	public $cookie_name = 'deviceseenbefore';
 
+	/**
+	 * Cookie hash
+	 *
+	 * @var string $cookie_hash
+	 */
 	public $cookie_hash;
 
-	function __construct() {
-		// Log when this plugin was first activated
+	/**
+	 * Get hooked in!
+	 */
+	public function __construct() {
+		// Log when this plugin was first activated.
 		add_option( 'newdevicenotification_installedtime', time() );
 
-		// Wait until "admin_init" to do anything else
+		// Wait until "admin_init" to do anything else.
 		if ( apply_filters( 'ndn_run_only_in_admin', true ) ) {
 			add_action( 'admin_init', array( $this, 'start' ), 99 );
 		} else {
@@ -34,20 +56,23 @@ class New_Device_Notification {
 		}
 	}
 
+	/**
+	 * "Start" the plugin
+	 */
 	public function start() {
 		global $current_user;
 
 		wp_get_current_user();
 
 		// By default, users to skip:
-		// * Super admins (Automattic employees visiting your site)
-		// * Users who don't have /wp-admin/ access
+		// * Super admins (Automattic employees visiting your site).
+		// * Users who don't have /wp-admin/ access.
 		$is_privileged_user = ! is_proxied_automattician() && current_user_can( 'edit_posts' );
 		if ( false === apply_filters( 'ndn_run_for_current_user', $is_privileged_user ) ) {
 			return;
 		}
 
-		// Set up the per-blog salt
+		// Set up the per-blog salt.
 		$salt = get_option( 'newdevicenotification_salt' );
 		if ( ! $salt ) {
 			$salt = wp_generate_password( 64, true, true );
@@ -61,14 +86,14 @@ class New_Device_Notification {
 			return;
 		}
 
-		// Attempt to mark this device as seen via a cookie
+		// Attempt to mark this device as seen via a cookie.
 		$this->set_cookie();
 
 		// Maybe we've seen this user+IP+agent before but they don't accept cookies?
 		$remote_addr = filter_input( INPUT_SERVER, 'REMOTE_ADDR', FILTER_VALIDATE_IP );
 		$remote_addr = sanitize_text_field( $remote_addr );
 
-		$user_agent = filter_input( INPUT_SERVER, 'HTTP_USER_AGENT' );
+		$user_agent = filter_input( INPUT_SERVER, 'HTTP_USER_AGENT', FILTER_SANITIZE_STRING );
 		$user_agent = sanitize_text_field( $user_agent );
 
 		$memcached_key = 'lastseen_' . $current_user->ID . '_' . md5( $remote_addr . '|' . $user_agent );
@@ -76,7 +101,7 @@ class New_Device_Notification {
 			return;
 		}
 
-		// As a backup to the cookie, record this IP address (only in memcached for now, proper logging will come later)
+		// As a backup to the cookie, record this IP address (only in memcached for now, proper logging will come later).
 		wp_cache_set( $memcached_key, time(), 'newdevicenotification' );
 
 		add_filter( 'ndn_send_email', array( $this, 'maybe_send_email' ), 10, 2 );
@@ -84,6 +109,11 @@ class New_Device_Notification {
 		$this->notify_of_new_device();
 	}
 
+	/**
+	 * Verify cookie
+	 *
+	 * @return bool
+	 */
 	public function verify_cookie() {
 		if ( ! empty( $_COOKIE[ $this->cookie_name ] ) && $_COOKIE[ $this->cookie_name ] === $this->cookie_hash ) {
 			return true;
@@ -92,6 +122,9 @@ class New_Device_Notification {
 		return false;
 	}
 
+	/**
+	 * Set the cookie
+	 */
 	public function set_cookie() {
 		if ( headers_sent() ) {
 			return false;
@@ -99,7 +132,7 @@ class New_Device_Notification {
 
 		$tenyrsfromnow = time() + ( YEAR_IN_SECONDS * 10 );
 
-		$parts          = parse_url( home_url() );
+		$parts          = wp_parse_url( home_url() );
 		$cookie_domains = apply_filters( 'ndn_cookie_domains', array( $parts['host'] ) );
 		$cookie_domains = array_unique( $cookie_domains );
 
@@ -108,6 +141,11 @@ class New_Device_Notification {
 		}
 	}
 
+	/**
+	 * Notify admin (default) of new device log-in
+	 *
+	 * @return bool
+	 */
 	public function notify_of_new_device() {
 		global $current_user;
 
@@ -119,8 +157,7 @@ class New_Device_Notification {
 		$location->region       = false;
 		$location->country_long = false;
 
-		// phpcs:ignore WordPressVIPMinimum.Variables.ServerVariables.UserControlledHeaders
-		$remote_addr = isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : '';
+		$remote_addr = filter_input( INPUT_SERVER, 'REMOTE_ADDR', FILTER_VALIDATE_IP );
 
 		$location = apply_filters( 'ndn_location', $location );
 		$blogname = html_entity_decode( get_bloginfo( 'name' ), ENT_QUOTES );
@@ -129,7 +166,7 @@ class New_Device_Notification {
 			$hostname = 'we were not able to get the host for this IP address';
 		}
 
-		// If we're still in the grace period, don't send an e-mail
+		// If we're still in the grace period, don't send an e-mail.
 		$installed_time = get_option( 'newdevicenotification_installedtime' );
 		$send_email     = ( time() - $installed_time < (int) apply_filters( 'ndn_grace_period', $this->grace_period ) ) ? false : true;
 
@@ -141,7 +178,7 @@ class New_Device_Notification {
 				'location' => $location,
 				'ip'       => $remote_addr,
 				'hostname' => $hostname,
-			) 
+			)
 		);
 
 		do_action(
@@ -151,7 +188,7 @@ class New_Device_Notification {
 				'location'   => $location,
 				'send_email' => $send_email,
 				'hostname'   => $hostname,
-			) 
+			)
 		);
 
 		if ( ! $send_email ) {
@@ -170,7 +207,8 @@ class New_Device_Notification {
 			)
 		);
 
-		// "admin_email" plus any e-mails passed to the vip_multiple_moderators() function
+		// "admin_email" plus any e-mails passed to the vip_multiple_moderators() function.
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
 		$emails = array_unique( (array) apply_filters( 'wpcom_vip_multiple_moderators', array( get_option( 'admin_email' ) ) ) );
 
 		$emails = apply_filters( 'ndn_send_email_to', $emails );
@@ -178,7 +216,7 @@ class New_Device_Notification {
 		$headers = 'Reply-to: "WordPress.com VIP Support" <vip-support@wordpress.com>' . "\r\n";
 
 
-		// Filtering the email address instead of a boolean so we can change it if needed
+		// Filtering the email address instead of a boolean so we can change it if needed.
 		$cc_user = apply_filters( 'ndn_cc_current_user', $current_user->user_email, $current_user );
 		if ( is_email( $cc_user ) ) {
 			$headers .= 'CC: ' . $cc_user . "\r\n";
@@ -186,12 +224,20 @@ class New_Device_Notification {
 
 		$headers = apply_filters( 'ndn_headers', $headers );
 
+		// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.wp_mail_wp_mail -- acknowledged. Use case is transactional.
 		wp_mail( $emails, $subject, $message, $headers );
 
 		return true;
 	}
 
-	function maybe_send_email( $send_email, $user_info ) {
+	/**
+	 * Determine if notice email should be sent
+	 *
+	 * @param bool  $send_email Current value.
+	 * @param array $user_info User info.
+	 * @return bool
+	 */
+	public function maybe_send_email( $send_email, $user_info ) {
 		if ( $this->is_user_from_valid_ip( $user_info['ip'] ) ) {
 			$send_email = false;
 		}
@@ -199,16 +245,29 @@ class New_Device_Notification {
 		return $send_email;
 	}
 
-	function is_user_from_valid_ip( $ip ) {
+	/**
+	 * Check if user is from a valid IP
+	 *
+	 * @param string $ip User IP.
+	 * @return bool
+	 */
+	public function is_user_from_valid_ip( $ip ) {
 		$whitelisted_ips = apply_filters( 'ndn_ip_whitelist', array() );
 		if ( ! empty( $whitelisted_ips ) && in_array( $ip, $whitelisted_ips ) ) {
 			return true;
 		}
 
-		return false; // covers two scenarios: invalid ip or no ip whitelist
+		return false; // covers two scenarios: invalid ip or no ip whitelist.
 	}
 
-	function get_standard_message( $user_obj, $args ) {
+	/**
+	 * Standard notification message
+	 *
+	 * @param WP_User $user_obj User logging in.
+	 * @param array   $args Information about log-in.
+	 * @return string The message.
+	 */
+	public function get_standard_message( $user_obj, $args ) {
 		if ( ! isset( $args['blogname'], $args['hostname'], $args['location'], $args['installed_time'] ) ) {
 			return false;
 		}
@@ -250,11 +309,10 @@ Resetting your password takes effect immediately.
 			$user_obj->display_name,                   // 1
 			$args['blogname'],                         // 2
 			trailingslashit( home_url() ),             // 3
-			// phpcs:ignore WordPressVIPMinimum.Variables.ServerVariables.UserControlledHeaders
-			isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : '',                   // 4
+			filter_input( INPUT_SERVER, 'REMOTE_ADDR', FILTER_VALIDATE_IP ),                   // 4
 			$args['hostname'],                         // 5
 			$args['location'],                         // 6
-			strip_tags( isset( $_SERVER['HTTP_USER_AGENT'] ) ? $_SERVER['HTTP_USER_AGENT'] : '' ), // 7, strip_tags() is better than nothing
+			filter_input( INPUT_SERVER, 'HTTP_USER_AGENT', FILTER_SANITIZE_STRING ), // 7, strip_tags() is better than nothing
 			$user_obj->user_login,                     // 8
 			$args['installed_time']                    // 9, Not adjusted for timezone but close enough
 		);
